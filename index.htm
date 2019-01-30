@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="https://vuejs.org/js/vue.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="message" :class="isSubscribed? 'green' : 'orange'">
+            {{isSubscribed ? 'Subscribed' : 'Not subscribed'}}
+        </div>
+
+
+        <label for="subscribe">Subscribe?</label>
+        <button @click="toggleSubscription">
+                {{isSubscribed ? 'Unsubscribe?' : 'Subscribe?'}}
+        </button>
+    </div>
+
+</body>
+
+<script>
+    /*
+    *   https://developers.google.com/web/fundamentals/codelabs/push-notifications/
+    */
+    $(document).ready(function () {
+        window.my_vcomp.registerServiceWorker();
+    });
+
+
+    (function () {
+        window.my_vcomp = new Vue({
+            el: '#app',
+            name: 'myComp',
+            data: {
+                swRegistration: {},
+                subcription: {},
+                //https://web-push-codelab.glitch.me/
+                publicKey: 'BO5JnLywZL9WgKyAN96AK0ldx_0a30QjFrf3urf79LcatO1fYcXnKJGWsiQmuLrCBK-VMAGaESFelzImmGn_zu4',
+            },
+            computed: {
+                pushManager: function () {
+                    return this.swRegistration && this.swRegistration.pushManager;
+                },
+                isSubscribed: function () {
+                    return !!(this.subcription && this.subcription.endpoint);
+                }
+            },
+            mounted: function () {
+                if (!this.pushManager) return;
+                this.subcription = this.pushManager.getSubscription()
+                    .then(function (subcription) {
+                        return subcription;
+                    });
+            },
+            methods: {
+                registerServiceWorker: function () {
+                    if (!navigator.serviceWorker) {
+                        console.error('service worker is not supported');
+                        return;
+                    }
+                    if (!window.PushManager) {
+                        console.error('push manager is not supported');
+                        return;
+                    }
+
+                    navigator.serviceWorker.register('serviceWorker.js')
+                        .then(swReg => {
+                            console.log('Service Worker is registered', swReg);
+                            this.$set(this, 'swRegistration', swReg);
+                        })
+                        .catch(function (error) {
+                            console.error('Service Worker Error', error);
+                        });
+                },
+
+                toggleSubscription: function () {
+                    this.isSubscribed ? this.unsubscribeFromNotifications() : this.subscribeToNotifications();
+                },
+
+                subscribeToNotifications: function () {
+                    console.log('...here will be the code subscribe users...');
+                    const applicationServerKey = this.urlB64ToUint8Array(this.publicKey);
+
+                    if (!this.pushManager) {
+                        console.error('push manager not found: ', this.swRegistration);
+                        return;
+                    }
+
+                    this.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: applicationServerKey
+                    })
+                        .then(subcription => {
+                            this.subcription = subcription;
+                            this.sendSubscriptionToServer();
+                        })
+                        .catch(error => {
+                            console.error('error subscribing to notifications: ', error);
+                        });
+                },
+
+                unsubscribeFromNotifications: function () {
+                    if(!this.subcription) return;
+
+                    this.subcription.unsubscribe();
+                    this.subcription = {};
+                    this.removeItemFromLocalStorage('subcription');
+                },
+
+                sendSubscriptionToServer() {
+                    this.setItemInLocalStorage('subcription', this.subcription);
+                },
+
+                setItemInLocalStorage(key, value){
+                    debugger;
+                    localStorage.setItem(key, JSON.stringify(value));
+                },
+                getItemFromLocalStorage(key){
+                    return localStorage.getItem(key);
+                },
+                removeItemFromLocalStorage(key){
+                    localStorage.removeItem(key);
+                },
+
+                urlB64ToUint8Array: function (base64String) {
+                    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                    const base64 = (base64String + padding)
+                        .replace(/\-/g, '+')
+                        .replace(/_/g, '/');
+
+                    const rawData = window.atob(base64);
+                    const outputArray = new Uint8Array(rawData.length);
+
+                    for (let i = 0; i < rawData.length; ++i) {
+                        outputArray[i] = rawData.charCodeAt(i);
+                    }
+                    return outputArray;
+                }
+            }
+        });
+
+    })();
+
+</script>
+
+<style>
+.green{
+    background-color: green;
+}
+.orange{
+    background-color: orange;
+}
+</style>
+
+</html>
